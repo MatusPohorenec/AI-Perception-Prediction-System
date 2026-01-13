@@ -376,7 +376,7 @@ st.markdown("---")
 
 # Sidebar info
 with st.sidebar:
-    st.image("https://img.icons8.com/clouds/200/artificial-intelligence.png", width=150)
+    st.markdown("## 🤖 AI Predictor")
     st.markdown("### About This App")
     st.markdown("""
     This application predicts AI adoption perceptions based on:
