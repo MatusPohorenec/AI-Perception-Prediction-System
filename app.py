@@ -235,25 +235,25 @@ COMPANY_FEATURES = {
 }
 
 AI_IMPACT_AREAS = {
-    'productivity': {
-        'label': '📈 Productivity Impact',
-        'help': 'Expected impact on work productivity'
+    'budgeting': {
+        'label': '📊 Budgeting Impact',
+        'help': 'Expected impact of AI on budgeting and cost estimation'
     },
-    'job_security': {
-        'label': '🔒 Job Security Impact',
-        'help': 'Expected impact on job security (1=Very Negative, 5=Very Positive)'
+    'design': {
+        'label': '✏️ Design Impact',
+        'help': 'Expected impact of AI on design processes'
     },
-    'skill_requirements': {
-        'label': '🎓 Skill Requirements Impact',
-        'help': 'Expected change in required skills'
+    'project_mgmt': {
+        'label': '📋 Project Management Impact',
+        'help': 'Expected impact of AI on project management'
     },
-    'work_quality': {
-        'label': '✨ Work Quality Impact',
-        'help': 'Expected impact on quality of work'
+    'marketing': {
+        'label': '📢 Marketing Impact',
+        'help': 'Expected impact of AI on marketing and sales'
     },
-    'cost_efficiency': {
-        'label': '💰 Cost Efficiency Impact',
-        'help': 'Expected impact on cost efficiency'
+    'logistics': {
+        'label': '🚛 Logistics Impact',
+        'help': 'Expected impact of AI on logistics and supply chain'
     }
 }
 
@@ -348,7 +348,7 @@ def create_bar_chart(categories, values, title):
     return fig
 
 def prepare_features(individual_data, company_data):
-    """Prepare feature vector for model prediction."""
+    """Prepare feature DataFrame for model prediction."""
     # Create composite indices similar to data_prep.py
     ai_experience_index = (
         individual_data.get('personal_ai_usage', 3) * 0.4 +
@@ -366,47 +366,87 @@ def prepare_features(individual_data, company_data):
     impact_values = list(company_data.get('ai_impacts', {}).values())
     ai_impact_index = np.mean(impact_values) if impact_values else 3.0
     
-    # Feature vector matching the model's expected features
-    features = np.array([
-        individual_data.get('age', 3),
-        company_data.get('company_size', 2),
-        individual_data.get('job_position', 4),
-        individual_data.get('work_experience', 3),
-        individual_data.get('ict_utilization', 3),
-        individual_data.get('personal_ai_usage', 3),
-        individual_data.get('digital_competencies', 3),
-        company_data.get('company_ai_usage', 3),
-        company_data.get('digitalization_level', 3),
-        individual_data.get('ai_training', 3),
-        company_data.get('ai_impacts', {}).get('productivity', 3),
-        company_data.get('ai_impacts', {}).get('job_security', 3),
-        company_data.get('ai_impacts', {}).get('skill_requirements', 3),
-        company_data.get('ai_impacts', {}).get('work_quality', 3),
-        company_data.get('ai_impacts', {}).get('cost_efficiency', 3),
-    ]).reshape(1, -1)
+    # Feature dictionary matching model's expected feature names
+    features_dict = {
+        'Age_Numeric': individual_data.get('age', 3),
+        'Company_Size_Numeric': company_data.get('company_size', 2),
+        'Job_Position_Numeric': individual_data.get('job_position', 4),
+        'Experience_Numeric': individual_data.get('work_experience', 3),
+        'ICT_Utilization_Numeric': individual_data.get('ict_utilization', 3),
+        'AI_Util_Personal_Numeric': individual_data.get('personal_ai_usage', 3),
+        'Digital_Competencies_Numeric': individual_data.get('digital_competencies', 3),
+        'AI_Util_Company_Numeric': company_data.get('company_ai_usage', 3),
+        'Digitalization_Level_Numeric': company_data.get('digitalization_level', 3),
+        'AI_Training_Numeric': individual_data.get('ai_training', 3),
+        'AI_Impact_Budgeting': company_data.get('ai_impacts', {}).get('budgeting', 3),
+        'AI_Impact_Design': company_data.get('ai_impacts', {}).get('design', 3),
+        'AI_Impact_ProjectMgmt': company_data.get('ai_impacts', {}).get('project_mgmt', 3),
+        'AI_Impact_Marketing': company_data.get('ai_impacts', {}).get('marketing', 3),
+        'AI_Impact_Logistics': company_data.get('ai_impacts', {}).get('logistics', 3),
+        'AI_Experience_Index': ai_experience_index,
+        'Digitalization_Index': digitalization_index,
+        'AI_Impact_Index': ai_impact_index,
+    }
     
-    return features, ai_experience_index, digitalization_index, ai_impact_index
+    # Create DataFrame
+    features_df = pd.DataFrame([features_dict])
+    
+    return features_df, ai_experience_index, digitalization_index, ai_impact_index
 
-def make_predictions(features):
+def make_predictions(features_df):
     """Make predictions using loaded models."""
     predictions = {}
     
-    if reg_model is not None:
+    # Regression prediction
+    if reg_model is not None and isinstance(reg_model, dict):
         try:
-            reg_pred = reg_model.predict(features)[0]
+            model = reg_model['model']
+            scaler = reg_model['scaler']
+            feature_cols = reg_model['features']
+            
+            # Extract required features
+            X = features_df[feature_cols].values
+            
+            # Scale features
+            X_scaled = scaler.transform(X)
+            
+            # Predict
+            reg_pred = model.predict(X_scaled)[0]
             predictions['regression'] = float(reg_pred)
         except Exception as e:
             predictions['regression'] = None
+            predictions['regression_error'] = str(e)
+    else:
+        predictions['regression'] = None
     
-    if class_models is not None:
+    # Classification predictions
+    if class_models is not None and isinstance(class_models, dict):
         class_preds = {}
-        for target_name, model in class_models.items():
+        for target_name, model_pkg in class_models.items():
             try:
-                pred = model.predict(features)[0]
-                class_preds[target_name] = int(pred)
+                if isinstance(model_pkg, dict):
+                    model = model_pkg['model']
+                    scaler = model_pkg['scaler']
+                    feature_cols = model_pkg['features']
+                    
+                    # Extract required features
+                    X = features_df[feature_cols].values
+                    
+                    # Scale features
+                    X_scaled = scaler.transform(X)
+                    
+                    # Predict
+                    pred = model.predict(X_scaled)[0]
+                    class_preds[target_name] = int(pred)
+                else:
+                    # Fallback for old format
+                    pred = model_pkg.predict(features_df)[0]
+                    class_preds[target_name] = int(pred)
             except Exception as e:
                 class_preds[target_name] = None
         predictions['classification'] = class_preds
+    else:
+        predictions['classification'] = {}
     
     return predictions
 
