@@ -27,3 +27,10 @@ build/
 
 # Logs
 *.log
+
+# Secrets
+.streamlit/secrets.toml
+
+# Sensitive data
+*.csv
+Survey in 2025.csv
