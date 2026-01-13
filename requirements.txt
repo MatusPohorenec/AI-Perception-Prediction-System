@@ -2,7 +2,8 @@ pandas
 numpy
 scikit-learn
 xgboost
-lightgbmstreamlit
+lightgbm
+streamlit
 plotly
 scipy
 mord
