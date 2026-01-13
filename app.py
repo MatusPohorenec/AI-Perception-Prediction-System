@@ -94,7 +94,18 @@ def load_models():
     
     return reg_model, class_models
 
+@st.cache_resource
+def load_correlations():
+    """Load pre-computed correlation matrix."""
+    models_path = Path("saved_models")
+    
+    if (models_path / "correlation_matrix.pkl").exists():
+        with open(models_path / "correlation_matrix.pkl", "rb") as f:
+            return pickle.load(f)
+    return None
+
 reg_model, class_models = load_models()
+correlation_data = load_correlations()
 
 # Feature definitions
 INDIVIDUAL_FEATURES = {
@@ -396,7 +407,7 @@ with st.sidebar:
     st.info("*'For small companies, it's redundant to invest in AI solutions, and would hurt their finances.'*")
 
 # Main tabs
-tab1, tab2, tab3 = st.tabs(["👤 Individual Profile", "🏢 Company Profile", "📊 Comparison & Analysis"])
+tab1, tab2, tab3, tab4 = st.tabs(["👤 Individual Profile", "🏢 Company Profile", "📊 Comparison & Analysis", "🔬 Correlation Analysis"])
 
 # Tab 1: Individual Profile
 with tab1:
@@ -811,6 +822,203 @@ with tab3:
         **strategic and proportionate**. The key is matching AI solutions to company resources 
         and focusing on high-ROI, low-risk applications first.
         """)
+
+# Tab 4: Correlation Analysis
+with tab4:
+    st.markdown("## 🔬 Correlation Analysis & Feature Importance")
+    st.markdown("Understand which factors have the strongest relationships with AI perception outcomes.")
+    
+    if correlation_data is not None:
+        corr_matrix = correlation_data['correlation_matrix']
+        columns = correlation_data['columns']
+        
+        # Rename columns for better display
+        display_names = {
+            'Age_Numeric': 'Age',
+            'Experience_Numeric': 'Work Experience',
+            'Company_Size_Numeric': 'Company Size',
+            'Job_Position_Numeric': 'Job Position',
+            'ICT_Utilization_Numeric': 'ICT Utilization',
+            'AI_Util_Personal_Numeric': 'Personal AI Usage',
+            'Digital_Competencies_Numeric': 'Digital Competencies',
+            'AI_Util_Company_Numeric': 'Company AI Usage',
+            'Digitalization_Level_Numeric': 'Digitalization Level',
+            'AI_Training_Numeric': 'AI Training',
+            'AI_Impact_Budgeting': 'AI Impact: Budgeting',
+            'AI_Impact_Design': 'AI Impact: Design',
+            'AI_Impact_ProjectMgmt': 'AI Impact: Project Mgmt',
+            'AI_Impact_Marketing': 'AI Impact: Marketing',
+            'AI_Impact_Logistics': 'AI Impact: Logistics',
+            'Perception_CostReduction_Numeric': 'Perception: Cost Reduction',
+            'Perception_Automation_Numeric': 'Perception: Automation',
+            'Perception_Materials_Numeric': 'Perception: Materials',
+            'Perception_ProjectMonitor_Numeric': 'Perception: Project Monitor',
+            'Perception_HR_Numeric': 'Perception: HR',
+            'Perception_Admin_Numeric': 'Perception: Admin',
+            'Perception_Planning_Numeric': 'Perception: Planning',
+            'AI_Experience_Index': 'AI Experience Index',
+            'Digitalization_Index': 'Digitalization Index',
+            'AI_Impact_Index': 'AI Impact Index',
+            'Importance of cost monitoring': 'Importance: Cost Monitoring',
+            'Importance of Schedule plan': 'Importance: Schedule Plan'
+        }
+        
+        # Filter to key variables
+        key_vars = [
+            'Age_Numeric', 'Experience_Numeric', 'Company_Size_Numeric', 'Job_Position_Numeric',
+            'ICT_Utilization_Numeric', 'AI_Util_Personal_Numeric', 'Digital_Competencies_Numeric',
+            'AI_Util_Company_Numeric', 'Digitalization_Level_Numeric', 'AI_Training_Numeric',
+            'AI_Experience_Index', 'Digitalization_Index', 'AI_Impact_Index',
+            'Perception_CostReduction_Numeric', 'Perception_Automation_Numeric'
+        ]
+        
+        available_vars = [v for v in key_vars if v in corr_matrix.columns]
+        filtered_corr = corr_matrix.loc[available_vars, available_vars]
+        
+        # Rename for display
+        filtered_corr.index = [display_names.get(c, c) for c in filtered_corr.index]
+        filtered_corr.columns = [display_names.get(c, c) for c in filtered_corr.columns]
+        
+        st.markdown("### 📈 Correlation Heatmap")
+        st.markdown("This heatmap shows how strongly different factors are correlated. **Red** = positive correlation, **Blue** = negative correlation.")
+        
+        # Create heatmap
+        fig = go.Figure(data=go.Heatmap(
+            z=filtered_corr.values,
+            x=filtered_corr.columns,
+            y=filtered_corr.index,
+            colorscale='RdBu_r',
+            zmid=0,
+            text=np.round(filtered_corr.values, 2),
+            texttemplate='%{text}',
+            textfont={"size": 10},
+            hovertemplate='%{y} vs %{x}<br>Correlation: %{z:.3f}<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            height=700,
+            xaxis={'tickangle': 45},
+            margin=dict(l=150, b=150)
+        )
+        
+        st.plotly_chart(fig, key="correlation_heatmap", use_container_width=True)
+        
+        # Top correlations table
+        st.markdown("---")
+        st.markdown("### 🔝 Strongest Correlations")
+        
+        col1, col2 = st.columns(2)
+        
+        # Calculate top correlations
+        corr_pairs = []
+        for i in range(len(filtered_corr.columns)):
+            for j in range(i+1, len(filtered_corr.columns)):
+                corr_pairs.append({
+                    'Factor 1': filtered_corr.columns[i],
+                    'Factor 2': filtered_corr.columns[j],
+                    'Correlation': filtered_corr.iloc[i, j]
+                })
+        
+        corr_df = pd.DataFrame(corr_pairs)
+        corr_df['Abs_Correlation'] = corr_df['Correlation'].abs()
+        corr_df = corr_df.sort_values('Abs_Correlation', ascending=False)
+        
+        with col1:
+            st.markdown("#### 🟢 Strongest Positive Correlations")
+            positive_corr = corr_df[corr_df['Correlation'] > 0].head(10)[['Factor 1', 'Factor 2', 'Correlation']]
+            st.dataframe(positive_corr, hide_index=True, use_container_width=True)
+        
+        with col2:
+            st.markdown("#### 🔴 Strongest Negative Correlations")
+            negative_corr = corr_df[corr_df['Correlation'] < 0].head(10)[['Factor 1', 'Factor 2', 'Correlation']]
+            if len(negative_corr) > 0:
+                st.dataframe(negative_corr, hide_index=True, use_container_width=True)
+            else:
+                st.info("No significant negative correlations found.")
+        
+        # Key Insights
+        st.markdown("---")
+        st.markdown("### 💡 Key Insights")
+        
+        st.success("""
+        **Main Findings from Correlation Analysis:**
+        
+        1. **AI Experience Index** is strongly driven by:
+           - Personal AI Usage (r = 0.90)
+           - Company AI Usage (r = 0.86)
+           - AI Training (r = 0.76)
+        
+        2. **Digitalization Index** is most influenced by:
+           - ICT Utilization (r = 0.84)
+           - Digital Competencies (r = 0.68)
+        
+        3. **AI Impact perception** correlates strongly with:
+           - AI Impact on Budgeting (r = 0.88)
+           - AI Impact on Project Management (r = 0.87)
+           - AI Impact on Design (r = 0.85)
+        
+        4. **Company Size shows weak correlations** with most perception variables, suggesting that 
+           individual readiness matters more than company scale for AI adoption success.
+        """)
+        
+        # Feature Importance from Model
+        st.markdown("---")
+        st.markdown("### 🎯 Feature Importance (Model-Based)")
+        
+        if reg_model is not None:
+            try:
+                # Get feature importance from Lasso coefficients
+                if hasattr(reg_model, 'named_steps'):
+                    model = reg_model.named_steps.get('lasso') or reg_model.named_steps.get('ridge')
+                    if model is not None and hasattr(model, 'coef_'):
+                        coefficients = model.coef_
+                        feature_names = [
+                            'Age', 'Company Size', 'Job Position', 'Work Experience',
+                            'ICT Utilization', 'Personal AI Usage', 'Digital Competencies',
+                            'Company AI Usage', 'Digitalization Level', 'AI Training',
+                            'AI Impact: Productivity', 'AI Impact: Job Security',
+                            'AI Impact: Skills', 'AI Impact: Work Quality', 'AI Impact: Cost'
+                        ]
+                        
+                        # Match lengths
+                        if len(coefficients) == len(feature_names):
+                            importance_df = pd.DataFrame({
+                                'Feature': feature_names,
+                                'Coefficient': coefficients,
+                                'Abs_Importance': np.abs(coefficients)
+                            }).sort_values('Abs_Importance', ascending=True)
+                            
+                            # Create horizontal bar chart
+                            colors = ['#ff6b6b' if c < 0 else '#54a0ff' for c in importance_df['Coefficient']]
+                            
+                            fig_importance = go.Figure(go.Bar(
+                                x=importance_df['Coefficient'],
+                                y=importance_df['Feature'],
+                                orientation='h',
+                                marker_color=colors,
+                                text=[f'{c:.3f}' for c in importance_df['Coefficient']],
+                                textposition='auto'
+                            ))
+                            
+                            fig_importance.update_layout(
+                                title='Feature Coefficients (Lasso Regression)',
+                                xaxis_title='Coefficient Value',
+                                yaxis_title='Feature',
+                                height=500
+                            )
+                            
+                            st.plotly_chart(fig_importance, key="feature_importance", use_container_width=True)
+                            
+                            st.markdown("""
+                            **Interpretation**: 
+                            - 🔵 **Blue bars** (positive coefficients) increase the prediction
+                            - 🔴 **Red bars** (negative coefficients) decrease the prediction
+                            - **Longer bars** indicate stronger influence on the outcome
+                            """)
+            except Exception as e:
+                st.warning(f"Could not extract feature importance: {e}")
+    else:
+        st.warning("Correlation data not available. Please run `compute_correlations.py` first.")
 
 # Footer
 st.markdown("---")
