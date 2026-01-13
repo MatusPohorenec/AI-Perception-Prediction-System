@@ -2,4 +2,8 @@ pandas
 numpy
 scikit-learn
 xgboost
-lightgbm
+lightgbmstreamlit
+plotly
+scipy
+mord
+optuna
