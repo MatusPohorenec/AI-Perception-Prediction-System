@@ -83,16 +83,37 @@ def load_models():
     
     reg_model = None
     class_models = None
+    errors = []
     
-    if (models_path / "regression_model.pkl").exists():
-        with open(models_path / "regression_model.pkl", "rb") as f:
-            reg_model = pickle.load(f)
+    # Debug: List files in saved_models directory
+    if models_path.exists():
+        files_found = list(models_path.glob("*.pkl"))
+    else:
+        errors.append(f"Directory {models_path} does not exist")
+        files_found = []
     
-    if (models_path / "classification_models.pkl").exists():
-        with open(models_path / "classification_models.pkl", "rb") as f:
-            class_models = pickle.load(f)
+    reg_path = models_path / "regression_model.pkl"
+    class_path = models_path / "classification_models.pkl"
     
-    return reg_model, class_models
+    try:
+        if reg_path.exists():
+            with open(reg_path, "rb") as f:
+                reg_model = pickle.load(f)
+        else:
+            errors.append(f"Regression model not found at {reg_path}")
+    except Exception as e:
+        errors.append(f"Error loading regression model: {e}")
+    
+    try:
+        if class_path.exists():
+            with open(class_path, "rb") as f:
+                class_models = pickle.load(f)
+        else:
+            errors.append(f"Classification models not found at {class_path}")
+    except Exception as e:
+        errors.append(f"Error loading classification models: {e}")
+    
+    return reg_model, class_models, errors, files_found
 
 @st.cache_resource
 def load_correlations():
@@ -104,8 +125,16 @@ def load_correlations():
             return pickle.load(f)
     return None
 
-reg_model, class_models = load_models()
+reg_model, class_models, model_errors, files_found = load_models()
 correlation_data = load_correlations()
+
+# Show debug info in sidebar if there are issues
+if model_errors:
+    with st.sidebar:
+        st.error("⚠️ Model Loading Issues:")
+        for err in model_errors:
+            st.write(f"- {err}")
+        st.write(f"Files found: {[f.name for f in files_found]}")
 
 # Feature definitions
 INDIVIDUAL_FEATURES = {
