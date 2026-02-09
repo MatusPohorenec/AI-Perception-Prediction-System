@@ -4,6 +4,7 @@ scikit-learn
 xgboost
 lightgbm
 streamlit
+altair<5
 plotly
 scipy
 mord
