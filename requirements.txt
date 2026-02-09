@@ -3,8 +3,7 @@ numpy
 scikit-learn
 xgboost
 lightgbm
-streamlit
-altair<5
+streamlit>=1.32.0
 plotly
 scipy
 mord
